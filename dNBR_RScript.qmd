@@ -382,16 +382,4 @@ cat("Lightning fire point data exported successfully to:", gpkg_file, "\n")
 
 ```
 
-\
 
-\
-
-\
-\
-
-\
-\
-\
-\
-
-\
