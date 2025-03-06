@@ -1,5 +1,5 @@
 ---
-title: "TNRD_dNBR_Data_Analysis"
+title: "TONRD_dNBR_Data_Analysis"
 author: "Carter J. Davey"
 format: html
 editor: visual
