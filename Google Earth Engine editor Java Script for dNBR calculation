@@ -1,0 +1,56 @@
+// Load the historical fire perimeters from your GEE Assets
+var firePerimeters = ee.FeatureCollection('projects/ee-carterdavey0/assets/H_FIRE_PLY_polygon'); 
+
+// Load the TONRD region from your GEE Assets
+var TONRD = ee.FeatureCollection('projects/ee-carterdavey0/assets/Thom_Oka'); 
+
+// Range of years to process
+var startYear = 1986; 
+var endYear = 2023;   
+
+// Loop through each consecutive year
+for (var year = startYear; year <= endYear; year++) {
+  
+  // Filter fire perimeters for the specific year and clip to the TONRD (Thompson Okanagan Natural Resource Disctrict)
+  var firePerimetersYear = firePerimeters
+                             .filter(ee.Filter.eq('FIRE_YEAR', year))
+                             .filterBounds(TONRD);
+  
+  // Load 32-day NBR dataset for the pre-fire date range (previous year)
+  var preFireDataset = ee.ImageCollection('LANDSAT/COMPOSITES/C02/T1_L2_32DAY_NBR')
+                    .filterDate((year - 1) + '-03-01', (year - 1) + '-07-31') // Pre-fire: March to July of previous year
+                    .select('NBR');
+  
+  // Mosaic the pre-fire image and clip it to the fire perimeters for the year
+  var preFireCombined = preFireDataset.mosaic().clip(firePerimetersYear);
+
+  // Load the 32-day NBR dataset for the post-fire date range (next year)
+  var postFireDataset = ee.ImageCollection('LANDSAT/COMPOSITES/C02/T1_L2_32DAY_NBR')
+                    .filterDate((year + 1) + '-03-01', (year + 1) + '-07-31') // Post-fire: March to July of next year
+                    .select('NBR');
+  
+  // Mosaic the post-fire image and clip it to the fire perimeters for the year
+  var postFireCombined = postFireDataset.mosaic().clip(firePerimetersYear);
+
+  // Calculate dNBR (i.e., prefire image - postfire image)
+  var dNBR = preFireCombined.subtract(postFireCombined).rename('dNBR');
+
+  // Visualize the dNBR map for each year
+  Map.centerObject(firePerimetersYear, 9); // Change zoom level or delete map center if it annoys you when it snaps back to a certain point
+  Map.addLayer(dNBR, {
+    min: -2.5, 
+    max: 1.08, 
+    palette: ['#08306B', '#2874A6', '#5DADE2', '#F4D03F', '#FDBE85', '#E34A33', '#B30000']
+  }, 'dNBR_' + year);
+
+  // Export the dNBR image to Google Drive
+  Export.image.toDrive({
+    image: dNBR,
+    description: 'dNBR_' + year, // File labeled with the year being analyzed
+    folder: 'dNBR_Clipped_TONRD', // Specify your desired folder name
+    region: TONRD.geometry(),
+    scale: 30,
+    maxPixels: 1e13,
+    crs: 'EPSG:3005'
+  });
+}
