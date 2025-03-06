@@ -1,0 +1,397 @@
+---
+title: "TNRD_dNBR_Data_Analysis"
+author: "Carter J. Davey"
+format: html
+editor: visual
+---
+
+```{r}
+library(terra)
+library(dplyr)
+library(tidyverse)
+library(sf)
+library(ggplot2)
+library(mapview)
+library(bcmaps)
+install.packages("ggpubr")
+library(ggpubr)
+install.packages("rstatix")
+library(rstatix)
+
+
+nr_regions_data <- nr_regions()
+TONRD <- nr_regions_data %>%
+  filter(REGION_NAME == "Thompson-Okanagan Natural Resource Region") %>%
+  st_as_sfc() %>%
+  st_buffer(2000) 
+
+Hist_Perim <- st_read("C:\\Users\\carte\\OneDrive\\Desktop\\Grad Essay Data Sets\\PROT_HISTORICAL_FIRE_POLYS_SP", quiet = TRUE) %>% 
+  filter(FIRE_YEAR >= 1986) %>% 
+  st_set_agr("constant") %>% 
+  st_intersection(TONRD)
+
+Hist_Fire_Point <- st_read("C:\\Users\\carte\\OneDrive\\Desktop\\Grad Essay Data Sets\\PROT_HISTORICAL_INCIDENTS_SP", quiet = TRUE) %>%
+  filter(FIRE_CAUSE == "Lightning", FIRE_YEAR >= 1986) %>% 
+  st_set_agr("constant") %>% 
+  st_intersection(TONRD)
+
+### List all pre-clipped dNBR files ###
+dnbr_files <- list.files("C:\\Users\\carte\\OneDrive\\Desktop\\Grad Essay Data Sets\\clipped_dNBR_TONRD", 
+                         pattern = "^dNBR_\\d{4}\\.tif$", full.names = TRUE)
+
+# Load dNBR rasters
+#dnbr_list <- lapply(dnbr_files, rast)
+# Combine all rasters into one using mosaic
+#combined_dnbr <- do.call(mosaic, dnbr_list)
+# Plot the combined raster
+#plot(combined_dnbr, main = "Combined dNBR Rasters")
+
+
+### Processing dNBR data ###
+dnbr_data <- lapply(dnbr_files, function(file) {
+  yr <- as.numeric(gsub("dNBR_|\\.tif", "", basename(file)))
+  
+  fire_point_yr <- Hist_Fire_Point %>%
+    filter(FIRE_YEAR == yr)
+  fire_poly_yr <- Hist_Perim %>%
+    filter(FIRE_YEAR == yr)
+  
+  if (nrow(fire_point_yr) == 0 || nrow(fire_poly_yr) == 0) {
+    message(paste("No data for year:", yr))
+    return(NULL)
+  }
+  
+  lightning_fire_proximity <- fire_point_yr %>%
+    st_filter(fire_poly_yr, .predicate = st_is_within_distance, dist = 90)
+  
+  if (nrow(lightning_fire_proximity) > 0) {
+    raster <- rast(file)
+    fire_point_extract <- lightning_fire_proximity %>%
+      bind_cols(terra::extract(raster, ., raw = TRUE, ID = FALSE))
+    return(fire_point_extract)
+  } else {
+    message(paste("No proximity data for year:", yr))
+    return(NULL)
+  }
+}) %>%
+  Filter(Negate(is.null), .) %>%
+  do.call(rbind, .)
+
+### Analyze reignition time by burn severity ###
+reignited_fires <- lapply(dnbr_files[grep("2023", dnbr_files, invert = TRUE)], function(file) {
+  yr <- as.numeric(gsub("dNBR_|\\.tif", "", basename(file)))
+  
+  dNBR_current_yr <- dnbr_data %>%
+    filter(FIRE_YEAR == yr) %>%
+    select(FIRE_YEAR_INIT = FIRE_YEAR, FIRE_CAUSE_INIT = FIRE_CAUSE, 
+           SIZE_HA_INIT = SIZE_HA, dNBR) %>%
+    st_set_agr("constant")
+  
+  if (nrow(dNBR_current_yr)) {
+    fire_future_yr <- Hist_Perim %>%
+      filter(FIRE_YEAR > yr) %>%
+      st_set_agr("constant")
+    
+    fire_overlap <- st_join(
+      fire_future_yr, dNBR_current_yr, .predicate = st_is_within_distance, 
+      dist = 90, left = FALSE
+    ) %>%
+      mutate(reignition_time = FIRE_YEAR - yr)
+    return(fire_overlap)
+  } else return(NULL)
+}) %>%
+  do.call(rbind, .)
+
+### Classify dNBR into burn severity levels classification matrix ###
+reignited_fires <- reignited_fires %>% 
+  mutate(
+   burn_severity = case_when(
+      dNBR * 1000 >= -148 & dNBR * 1000 <= 100 ~ "Unburned",
+      dNBR * 1000 >= 101 & dNBR * 1000 <= 305 ~ "Low Severity",
+      dNBR * 1000 >= 306 & dNBR * 1000 <= 550 ~ "Moderate Severity",
+      dNBR * 1000 >= 551 & dNBR * 1000 <= 1115 ~ "High Severity",
+      dNBR * 1000 < -150 ~ "Increased Greenness",  
+      TRUE ~ NA_character_                       
+    )
+  ) %>%
+ filter(!is.na(burn_severity))  
+
+
+### Export reignited_fires as geotiff. #######################################
+
+
+output_dir <- ("C:\\Users\\carte\\OneDrive\\Desktop\\Grad Essay Data Sets")
+gpkg_file <- file.path(output_dir, "reignited_fires.gpkg")
+
+
+st_write(reignited_fires, gpkg_file, delete_layer = TRUE)
+
+cat("GeoPackage exported successfully to:", gpkg_file, "\n")
+
+##############################################################################
+
+# Check normality with Shapiro-Wilk test (per group) ###
+normality_test <- anova_data %>%
+  group_by(burn_severity) %>%
+  summarise(
+    shapiro_p = shapiro.test(reignition_time)$p.value
+  )
+
+print(normality_test)
+
+
+ggplot(anova_data, aes(sample = reignition_time)) +
+  facet_wrap(~ burn_severity) +
+  stat_qq() +
+  stat_qq_line() +
+  labs(title = "QQ Plots for Reignition Time by Burn Severity")
+
+
+### Check homogeneity of variance with Bartlett’s Test ###
+bartlett_test <- bartlett.test(reignition_time ~ burn_severity, data = anova_data)
+print(bartlett_test)
+
+# Decision rule:
+if (any(normality_test$shapiro_p < 0.05) | bartlett_test$p.value < 0.05) {
+  cat("Violations detected: Consider using the Kruskal-Wallis test.\n")
+} else {
+  cat("No violations detected: ANOVA assumptions are met.\n")
+}
+
+
+shapiro_test <- anova_data %>%
+  group_by(burn_severity) %>%
+  summarise(shapiro_p = shapiro.test(reignition_time)$p.value)
+print(shapiro_test)
+
+
+########################### Kruskal's and Dunn's Post Hoc Test####################
+
+
+kruskal_data <- st_drop_geometry(reignited_fires) %>%
+  select(burn_severity, reignition_time)
+
+
+kruskal_result <- kruskal.test(reignition_time ~ burn_severity, data = kruskal_data)
+print(kruskal_result)
+
+
+dunn_result <- kruskal_data %>%
+  dunn_test(reignition_time ~ burn_severity, p.adjust.method = "bonferroni")
+
+print(dunn_result)
+
+
+kruskal_summary <- kruskal_data %>%
+  group_by(burn_severity) %>%
+  summarise(
+    count = n(),
+    median_reignition = median(reignition_time, na.rm = TRUE),
+    mean_reignition = mean(reignition_time, na.rm = TRUE),
+    min_reignition = min(reignition_time, na.rm = TRUE),
+    max_reignition = max(reignition_time, na.rm = TRUE)
+  )
+
+print(kruskal_summary)
+
+
+kruskal_data <- st_drop_geometry(reignited_fires) %>%
+  select(burn_severity, reignition_time)
+
+
+kruskal_result <- kruskal.test(reignition_time ~ burn_severity, data = kruskal_data)
+print(kruskal_result)
+
+
+dunn_result <- dunn_test(kruskal_data, reignition_time ~ burn_severity, p.adjust.method = "bonferroni")
+print(dunn_result)
+
+
+burn_severity_shapes <- c(
+  "Unburned" = 21,                     
+  "Low Severity" = 22, 
+  "Moderate Severity" = 23, 
+  "High Severity" = 24
+)
+
+
+ggplot(kruskal_data, aes(x = burn_severity, y = reignition_time, fill = burn_severity)) +
+  geom_boxplot(outlier.shape = NA, alpha = 0.7, color = "black", size = 0.5) +  
+  geom_jitter(aes(shape = burn_severity), width = 0.2, alpha = 0.65, color = "black", size = 2) +  
+  scale_shape_manual(values = burn_severity_shapes) +  
+  labs(
+    title = paste("Kruskal-Wallis Test: p =", round(kruskal_result$p.value, 4)),
+    x = "Burn Severity",
+    y = "Reignition Time (years)"
+  ) +
+  theme_minimal() +
+  theme(
+    text = element_text(family = "Times New Roman"),  
+    axis.text.x = element_text(angle = 30, hjust = 1, vjust = 1, size = 12, color = "black"),  
+    axis.text.y = element_text(size = 12, hjust= 1.5, vjust = 0.5, color = "black"),  
+    axis.title.y = element_text(size = 14, margin = margin(r = 15, t = 0, b = 0, l = 0), face = "bold"),
+    axis.title.x = element_text(size = 14, margin = margin(r = 0, t = 5, b = 5, l = 0), vjust = -2, face = "bold"),
+    legend.position = "none"  
+  ) +
+  scale_fill_brewer(palette = "Set2")  
+
+
+ggsave(
+  filename = "kruskal_wallis_boxplot.png",  
+  plot = last_plot(),  
+  path = "C:/Users/carte/OneDrive/Desktop/",  
+  width = 8,  
+  height = 6,  
+  dpi = 300  
+)
+
+##################################################################################
+
+
+
+### Cusromizing plots ###
+
+install.packages("viridis")
+library("viridis")   
+
+#install.packages("extrafont")
+library(extrafont)
+#font_import(prompt = FALSE)
+#loadfonts(device = "win")  
+fonts()
+
+### Define shape values for burn severity categories ###
+burn_severity_shapes <- c(
+                "Unburned" = 21,                     
+                "Low Severity" = 22, 
+                "Moderate Severity" = 23, 
+                "High Severity" = 24)
+
+
+ggplot(anova_data, aes(x = burn_severity, y = reignition_time, fill = burn_severity)) +
+  geom_boxplot(outlier.shape = NA, alpha = 0.7, color = "black", size = 0.5) +  
+  geom_jitter(aes(shape = burn_severity), width = 0.2, alpha = 0.65, color = "black", size = 2) +  
+  scale_shape_manual(values = burn_severity_shapes) +  
+  labs(
+    x = "Burn Severity",
+    y = "Reignition Time (years)"
+  ) +
+  theme_minimal() +
+  theme(
+    text = element_text(family = "Times New Roman"),  
+    axis.text.x = element_text(angle = 30, hjust = 1, vjust = 1, size = 12, color = "black"),  
+    axis.text.y = element_text(size = 12, hjust= 1.5, vjust = 0.5, color = "black"),  
+    axis.title.y = element_text(size = 14, margin = margin(r = 15, t = 0, b = 0, l = 0), face = "bold"),
+    axis.title.x = element_text(size = 14, margin = margin(r = 0, t = 5, b = 5, l = 0), vjust = -2, face = "bold"),
+    legend.position = "none"  
+  ) +
+  scale_fill_brewer(palette = "Set2")  
+
+
+ggsave(
+  filename = "reignition_boxplot.png",  
+  plot = last_plot(),  
+  path = "C:/Users/carte/OneDrive/Desktop/", 
+  width = 8,  
+  height = 6,  
+  dpi = 300  
+)
+
+
+
+
+template_raster <- rast("C:\\Users\\carte\\OneDrive\\Desktop\\Grad Essay Data Sets\\clipped_dNBR_TONRD\\dNBR_2021.tif")
+
+rasterized_fires <- rasterize(reignited_fires, template_raster, field = "burn_severity")
+
+output_tif <- "C:\\Users\\carte\\OneDrive\\Desktop\\Grad Essay Data Sets\\TONRD_reignited_fires.tif"
+
+writeRaster(rasterized_fires, filename = output_tif, overwrite = TRUE)
+
+cat("The GeoTIFF file has been saved to:", output_tif, "\n")
+
+
+
+
+
+
+lm_model <- lm(reignition_time ~ burn_severity, data = anova_data)
+
+
+r_squared <- summary(lm_model)$r.squared
+
+cat("R-squared value:", r_squared, "\n")
+
+
+
+############## Extracting corresponding lightning fires for each reignition ##############
+
+lightning_reignition_matches <- st_join(
+  reignited_fires,  
+  Hist_Fire_Point,  
+  join = st_intersects  
+)
+
+
+if (!("LATITUDE" %in% colnames(lightning_reignition_matches)) | 
+    !("LONGITUDE" %in% colnames(lightning_reignition_matches))) {
+  stop("Error: LATITUDE or LONGITUDE columns are missing.")
+}
+
+
+lightning_fire_points <- lightning_reignition_matches %>%
+  select(
+    FIRE_NO.y,    # Lightning fire ID
+    FIRE_YEAR.y,  # Year of Lightning Fire
+    FIRE_CAUSE.y, # Cause 
+    LATITUDE,     # Latitude coordinate
+    LONGITUDE,    # Longitude coordinate
+    SIZE_HA.y,    # Fire Size in hectares
+    burn_severity # Burn severity classification
+  ) %>%
+  rename(
+    FIRE_NO = FIRE_NO.y,
+    FIRE_YEAR = FIRE_YEAR.y,
+    FIRE_CAUSE = FIRE_CAUSE.y,
+    SIZE_HA = SIZE_HA.y
+  ) %>%
+  filter(FIRE_CAUSE == "Lightning") %>%  
+  mutate(geometry = st_sfc(map2(LONGITUDE, LATITUDE, ~st_point(c(.x, .y))), crs = 4326)) %>%  
+  st_as_sf() %>%  
+  st_transform(crs = 3005)  
+
+
+st_geometry(lightning_fire_points) <- "geometry"
+
+
+lightning_reignition_matches <- Hist_Fire_Point %>%
+  filter(FIRE_CAUSE == "Lightning") %>%  
+  st_filter(reignited_fires)  
+
+
+output_dir <- "C:/Users/carte/OneDrive/Desktop/Grad Essay Data Sets"
+gpkg_file <- file.path(output_dir, "lightning_fire_points_multi.gpkg")
+
+
+st_write(lightning_reignition_matches, gpkg_file, delete_layer = TRUE)
+
+cat("Lightning fire point data exported successfully to:", gpkg_file, "\n")
+
+
+
+
+```
+
+\
+
+\
+
+\
+\
+
+\
+\
+\
+\
+
+\
