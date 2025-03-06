@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en" class="ide">
+  <head>
+  <title>Earth Engine Code Editor</title>
+<link rel="stylesheet" href="//fonts.googleapis.com/css?family=Open+Sans:300">
+<link rel="stylesheet" href="//fonts.googleapis.com/css?family=Roboto:300,400,500,700">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto+Mono:400,500">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Material+Icons">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Icons+Round">
+<link rel="shortcut icon" href="/favicon.png">
+<link rel="stylesheet" href="https://www.gstatic.com/external_hosted/material_design_lite/mdl_css-blue-indigo-bundle.css">
+<script defer nonce="RwN/Z7Tbu2X5oxVpBxKYcvXLunGnpS" src="https://www.gstatic.com/external_hosted/material_design_lite/mdl_all_js_compiled.js"></script>
+<!-- Google tag (gtag.js) -->
+<script async nonce="RwN/Z7Tbu2X5oxVpBxKYcvXLunGnpS" src="https://www.googletagmanager.com/gtag/js?id=G-3N9E042GJH"></script>
+  <script nonce="RwN/Z7Tbu2X5oxVpBxKYcvXLunGnpS"
+      src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCIdO53SBE0yrw3mmxBnfF3HeIIj316gA0&region=&language=None&v=quarterly&libraries=drawing,places">
+  </script>
+  <script nonce="RwN/Z7Tbu2X5oxVpBxKYcvXLunGnpS" src="/javascript/fuzzy.js"></script>
+  <!-- Automatically load polyfills for Web Component APIs if needed. -->
+  <script nonce="RwN/Z7Tbu2X5oxVpBxKYcvXLunGnpS" src="/javascript/polyfills/webcomponentsjs/webcomponents-loader.js"></script>
+  <script nonce="RwN/Z7Tbu2X5oxVpBxKYcvXLunGnpS" src="/javascript/polyfills/web-animations-next-lite.min.js"></script>
+  <script nonce="RwN/Z7Tbu2X5oxVpBxKYcvXLunGnpS">
+      window._ee_flag_initialData = {"acceptedRepoName": null, "allowLegacyAssetHomeFolder": true, "analyticsId": "G-3N9E042GJH", "appEngineVersionId": "398841915", "appsDomain": "earthengine.app", "assetId": null, "authClientId": "174092772876-102p5aff6h4dbm6o6aa024ouan0jr48d.apps.googleusercontent.com", "authScopes": ["openid", "email", "https://www.googleapis.com/auth/earthengine", "https://www.googleapis.com/auth/devstorage.full_control", "https://www.googleapis.com/auth/cloud-platform", "https://www.googleapis.com/auth/drive"], "authToken": "ya29.a0AeXRPp64kLO86DTi2GwyCybQmtCkZx0KI1EMANGBJMijGkCzsy_-YlyIgEtbqktdcC1ulxcLVqdrg8Zv57bOO8E29X3dXkMCD_fKdehqEp5RK7QHlvdaU8VnRGvzhRoH598yRPVxApSGl_Aa3dGJY2RMJNjp-Fx9TXyrdxOsuxZaqtpfaCgYKARkSARASFQHGX2Mi6A7kR-zyTUCWRQBZIK_K1Q0183", "authTokenExpiresInMs": 3598070, "blocked": false, "email": "carterdavey0@gmail.com", "hideCode": 0, "isExempt": false, "isGoogler": false, "jsSourceType": "compiled", "mapsApiKey": "AIzaSyCIdO53SBE0yrw3mmxBnfF3HeIIj316gA0", "mapsVersion": "quarterly", "mapLanguage": null, "mapRegion": "", "placeSearchFilter": "(regions)", "preferences": {"SHARED_REPOS_WHITELISTED": {"users/sat-io/awesome-gee-catalog-examples": true}, "UI_TOP_PANEL_HEIGHT": 0.5521091811414393, "UI_LEFT_PANEL_WIDTH": 0.2067819148936171, "UI_RIGHT_PANEL_WIDTH": 0.2599166666666666, "FAST_REPO_LISTS": [{"name": "users/daveyc20/dNBR_gee_java_script", "access": "owner"}, {"name": "users/sat-io/awesome-gee-catalog-examples", "access": "reader"}], "APP_PROJECT": "ee-carterdavey0", "USER_ASSETS_PROJECTS": ["ee-carterdavey0"], "VIEWED_TOURS": {"root": 1, "UserInterface.leftPanel": 1, "editor.Panel": 1, "UserInterface.rightPanel": 1, "knobs.KnobsRoot": 1, "SearchBox": 1, "CloudProject": 1}, "TREE_FOLDER_EXPANDED\nexamples:": false, "REPO_LIST_EXPANDED\nreader": true, "TREE_FOLDER_EXPANDED\nrepo:users/sat-io/awesome-gee-catalog-examples:": false, "TREE_FOLDER_EXPANDED\nassets:projects/ee-carterdavey0/assets:projects/ee-carterdavey0/assets": true, "TREE_FOLDER_EXPANDED\nassets:users/daveyc20:users/daveyc20": false, "TREE_FOLDER_EXPANDED\nexamples:Datasets": true, "TREE_FOLDER_EXPANDED\nexamples:Datasets/LANDSAT": true, "TREE_FOLDER_EXPANDED\nexamples:Image Collection": true, "TREE_FOLDER_EXPANDED\nrepo:users/daveyc20/dNBR_gee_java_script:": true, "REPO_LIST_EXPANDED\narchive": false, "REPO_LIST_EXPANDED\nwriter": false, "REPO_LIST_EXPANDED\nowner": true, "TREE_FOLDER_EXPANDED\nrepo:users/daveyc20/dNBR_gee_java_script:GEE Java NBR (post": false, "TREE_FOLDER_EXPANDED\nrepo:users/daveyc20/dNBR_GEE_TONRD:": false, "TREE_FOLDER_EXPANDED\nrepo:users/daveyc20/dNBR_gee_java_script:New_dNBR_Thom-Oka": false, "TREE_FOLDER_EXPANDED\nrepo:users/daveyc20/dNBR_gee_java_script:New_dNBR_T-O": true}, "prodAppHost": "code.earthengine.google.com", "prodAppUrl": "https://code.earthengine.google.com", "prodRealm": "https://earthengine.googleapis.com", "project": "ee-carterdavey0", "projectRegistered": true, "projectError": 0, "runOnLoad": true, "restricted": false, "scriptPath": null, "scriptId": null, "stagingRealms": null, "trustedTester": false, "xsrfToken": "wLRLHYiHlLmEub8F4cPj7ybCftGp08acJXjgzemclss6MTc0MTIzMDU4NzMwNjY5NA", "xsrfTokenExpiresInMs": 86400000.0, "summitPreview": false, "exportVideoMapPreview": false};
+  </script>
+  
+    <script nonce="RwN/Z7Tbu2X5oxVpBxKYcvXLunGnpS">
+      
+      window.CLOSURE_NO_DEPS = true;
+    </script>
+    
+      <script nonce="RwN/Z7Tbu2X5oxVpBxKYcvXLunGnpS" src="/javascript/playground.js"></script>
+    
+    <link rel="stylesheet" href="/css/playground.css">
+  
+  </head>
+  <body>
+    <div id="head">
+  <div id="logo">
+    <img src="/images/GoogleEarthEngine_v1.png" alt="Google Earth Engine" />
+  </div>
+  <div id="search-container"></div>
+  
+</div>
+    <ee-app-context>
+      <div id="main" class="main"></div>
+    </ee-app-context>
+    <script nonce="RwN/Z7Tbu2X5oxVpBxKYcvXLunGnpS">
+      playground.App.boot();
+    </script>
+  </body>
+</html>
